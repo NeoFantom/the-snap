@@ -26,5 +26,5 @@ For pre-wipe file audit / migration, follow the workflow in
 
 ## Invoke
 
-Mention the trigger keywords (see `../../SKILL.md` frontmatter) — Codex
-will pick up the SKILL.md and follow its step-by-step pipeline.
+Mention the trigger phrases (see the `description` / `when_to_use` in
+`../../SKILL.md`) — Codex will pick up the SKILL.md and follow its pipeline.

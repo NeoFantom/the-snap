@@ -1,19 +1,7 @@
 ---
 name: the-snap
-description: Audit a machine (or directory) before wipe/cleanup — index, diff against a reference, refine to a hand-reviewable to-migrate list, copy with verification.
-trigger_keywords:
-  - migrate
-  - migration
-  - wipe
-  - decommission
-  - audit files
-  - what's unique on this machine
-  - C drive cleanup
-  - collect project files
-  - 响指
-  - 文件整理
-  - 迁移
-  - 重置前
+description: Audit a machine (or directory) before wipe/cleanup — index it and a reference, match files by name+content hash to find what exists ONLY on the doomed machine, review in a web tree, then copy and verify. Works for Windows, macOS, Linux, WSL on either side.
+when_to_use: Use when a machine is about to be reset / wiped / decommissioned and the user wants to confirm everything important already has a copy elsewhere; when cleaning a fat C-drive and asking "what's actually unique here?"; or when collecting all files for a project/topic before archiving. Trigger phrases include "migrate", "migration", "wipe", "decommission", "before I reset this PC", "audit files", "what's unique on this machine", "C drive cleanup", "collect project files", as well as Chinese "响指", "文件整理", "迁移", "重置前".
 ---
 
 # the-snap / 响指 — agent workflow

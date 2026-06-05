@@ -16,6 +16,6 @@ If your OpenCode version uses a different convention (e.g.
 
 ## Invoke
 
-Mention any trigger keyword from `../../SKILL.md`'s frontmatter
-(`migrate`, `wipe`, `audit files`, `响指`, ...) and OpenCode will
-load the skill and walk through the pipeline.
+Mention any trigger phrase from the `description` / `when_to_use` in
+`../../SKILL.md` (`migrate`, `wipe`, `audit files`, `响指`, ...) and OpenCode
+will load the skill and walk through the pipeline.

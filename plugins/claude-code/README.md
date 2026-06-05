@@ -36,7 +36,7 @@ You should see `the-snap` in the list with the description from
 
 Either:
 
-- **Implicit**: ask in natural language — e.g. *"我要重置这台 Windows，先帮我核对一下文件有没有都迁过来"* or *"audit this machine before I wipe it"*. The `trigger_keywords` in SKILL.md (Chinese + English) include `migrate`, `wipe`, `audit files`, `响指`, `迁移`, etc.
+- **Implicit**: ask in natural language — e.g. *"我要重置这台 Windows，先帮我核对一下文件有没有都迁过来"* or *"audit this machine before I wipe it"*. Claude decides from the `description` / `when_to_use` in SKILL.md, which list trigger phrases in Chinese + English (`migrate`, `wipe`, `audit files`, `响指`, `迁移`, …).
 - **Explicit**: `/the-snap` (if your Claude Code version supports
   slash-named skills) or just paste `Skill({skill: "the-snap"})`.
 

@@ -11,14 +11,14 @@ Pick one:
 ### A. Symlink (recommended, gets updates via `git pull`)
 
 ```bash
-ln -s "$(pwd)" ~/.claude/skills/file-organizer
+ln -s "$(pwd)" ~/.claude/skills/the-snap
 ```
 
 ### B. Copy
 
 ```bash
-mkdir -p ~/.claude/skills/file-organizer
-cp -R ./* ~/.claude/skills/file-organizer/
+mkdir -p ~/.claude/skills/the-snap
+cp -R ./* ~/.claude/skills/the-snap/
 ```
 
 ## Verify
@@ -29,16 +29,16 @@ In a Claude Code session, type:
 /skills
 ```
 
-You should see `file-organizer` in the list with the description from
+You should see `the-snap` in the list with the description from
 `SKILL.md`'s frontmatter.
 
 ## Invoke
 
 Either:
 
-- **Implicit**: ask in natural language — e.g. *"我要重置这台 Windows，先帮我核对一下文件有没有都迁过来"* or *"audit this machine before I wipe it"*. The `trigger_keywords` in SKILL.md (Chinese + English) include `migrate`, `wipe`, `audit files`, `文件收纳师`, `迁移`, etc.
-- **Explicit**: `/file-organizer` (if your Claude Code version supports
-  slash-named skills) or just paste `Skill({skill: "file-organizer"})`.
+- **Implicit**: ask in natural language — e.g. *"我要重置这台 Windows，先帮我核对一下文件有没有都迁过来"* or *"audit this machine before I wipe it"*. The `trigger_keywords` in SKILL.md (Chinese + English) include `migrate`, `wipe`, `audit files`, `响指`, `迁移`, etc.
+- **Explicit**: `/the-snap` (if your Claude Code version supports
+  slash-named skills) or just paste `Skill({skill: "the-snap"})`.
 
 ## What the skill does
 

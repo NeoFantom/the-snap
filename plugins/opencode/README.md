@@ -8,7 +8,7 @@ adapters use.
 
 ```bash
 mkdir -p ~/.opencode/skills
-ln -s "$(pwd)" ~/.opencode/skills/file-organizer
+ln -s "$(pwd)" ~/.opencode/skills/the-snap
 ```
 
 If your OpenCode version uses a different convention (e.g.
@@ -17,5 +17,5 @@ If your OpenCode version uses a different convention (e.g.
 ## Invoke
 
 Mention any trigger keyword from `../../SKILL.md`'s frontmatter
-(`migrate`, `wipe`, `audit files`, `文件收纳师`, ...) and OpenCode will
+(`migrate`, `wipe`, `audit files`, `响指`, ...) and OpenCode will
 load the skill and walk through the pipeline.

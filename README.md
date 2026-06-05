@@ -1,8 +1,12 @@
-# 文件收纳师 / file-organizer
+# the-snap
 
+> Half your files are about to vanish with a wipe. You decide who survives.
+>
 > A reproducible workflow for migrating, auditing, and pruning files across
 > machines — built for the "PC about to be wiped, what did I forget?" moment,
 > usable for any file-organizing chore.
+
+📖 **中文说明 → [README.zh-CN.md](./README.zh-CN.md)**（项目中文名:**响指**）
 
 **Status**: extracted from a real one-shot migration; APIs may shift before 1.0.
 
@@ -97,7 +101,7 @@ gotchas): see `SKILL.md`.
 Each `plugins/<agent>/` directory is a self-contained manifest pointing at
 `SKILL.md`. Symlink or copy into the agent's skill folder:
 
-- **Claude Code**: `~/.claude/skills/file-organizer/` → `plugins/claude-code/`
+- **Claude Code**: `~/.claude/skills/the-snap/` → `plugins/claude-code/`
 - **Codex**: see `plugins/codex/README.md`
 - **OpenCode**: see `plugins/opencode/README.md`
 

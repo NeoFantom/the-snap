@@ -1,7 +1,7 @@
 # Codex adapter
 
 Codex (OpenAI Codex CLI) reads agent context from `AGENTS.md` and
-project-rooted instructions. To make `file-organizer` available as a
+project-rooted instructions. To make `the-snap` available as a
 skill there:
 
 ## Install
@@ -10,7 +10,7 @@ skill there:
 
 ```bash
 mkdir -p ~/.codex/skills
-ln -s "$(pwd)" ~/.codex/skills/file-organizer
+ln -s "$(pwd)" ~/.codex/skills/the-snap
 ```
 
 ### B. As a project-rooted reference
@@ -18,10 +18,10 @@ ln -s "$(pwd)" ~/.codex/skills/file-organizer
 Add to the project's `AGENTS.md`:
 
 ```markdown
-## file-organizer skill
+## the-snap skill
 
 For pre-wipe file audit / migration, follow the workflow in
-@~/projects/file-organizer/SKILL.md.
+@~/projects/the-snap/SKILL.md.
 ```
 
 ## Invoke

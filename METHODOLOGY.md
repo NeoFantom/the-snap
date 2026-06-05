@@ -1,4 +1,4 @@
-# Methodology — file-organizer
+# Methodology — the-snap
 
 > Reusable principles + tested patterns for "audit & migrate before wipe"
 > work. Separate from any project-specific execution log, which records

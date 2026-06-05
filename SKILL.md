@@ -1,5 +1,5 @@
 ---
-name: file-organizer
+name: the-snap
 description: Audit a machine (or directory) before wipe/cleanup — index, diff against a reference, refine to a hand-reviewable to-migrate list, copy with verification.
 trigger_keywords:
   - migrate
@@ -10,13 +10,13 @@ trigger_keywords:
   - what's unique on this machine
   - C drive cleanup
   - collect project files
-  - 文件收纳师
+  - 响指
   - 文件整理
   - 迁移
   - 重置前
 ---
 
-# file-organizer / 文件收纳师 — agent workflow
+# the-snap / 响指 — agent workflow
 
 > One-shot "is everything safe before I wipe this?" audit + migration.
 > Works for: PC handoff, C-drive cleanup, scoping a project's true file

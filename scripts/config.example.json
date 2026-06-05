@@ -1,0 +1,54 @@
+{
+  "_comment": "Copy to config.json and edit for your own run. Every script reads ./config.json by default (override with $FO_CONFIG).",
+
+  "source": {
+    "_comment": "The machine about to be wiped / decommissioned. Currently only Windows-over-SSH is supported as a source.",
+    "host": "old-machine.local",
+    "user": "non-admin-user",
+    "drives": ["C", "D"],
+    "skip_full": []
+  },
+
+  "reference": {
+    "_comment": "The machine that already has copies of most files. Indexed by mounting/walking locally.",
+    "roots": ["/mnt/c", "/mnt/s"],
+    "skip_done": []
+  },
+
+  "landed_root": {
+    "_comment": "Where copies land. The verify step stats files here.",
+    "path": "/mnt/c/Backup/from-source"
+  },
+
+  "exclude_dirs": [
+    "Windows", "Program Files", "Program Files (x86)",
+    "$Recycle.Bin", "System Volume Information", "Recovery",
+    "$WinREAgent", "$Windows.~BT", "$Windows.~WS",
+    "PerfLogs", "Config.Msi", "OneDriveTemp", "MSOCache",
+    "Documents and Settings", "system.sav",
+    "node_modules", ".git", "__pycache__", ".cache",
+    "target", "dist", "build", ".gradle", ".conda", ".venv", "venv",
+    ".idea", ".vscode", ".ipynb_checkpoints",
+
+    {"_comment_app_shared_roots": "DANGER: ProgramData, AppData, Public — these are shared-data roots. Excluding them by name buries user-placed portable apps and chat history. Audit their TOP LEVEL first (manually or via subagent), THEN add to this list only if you've confirmed nothing user-valuable lives there. See METHODOLOGY.md section 5."},
+    "ProgramData", "AppData"
+  ],
+
+  "third_party_names": [
+    {"_comment": "directory names that mark a public re-clonable repo; add as discovered"}
+  ],
+
+  "user_drop": [
+    {"_comment": "absolute paths the user has decided NOT to migrate (e.g. Downloads, another-account profile). Filled via Web UI or by hand."}
+  ],
+
+  "skip_prefix": [
+    {"_comment": "absolute paths handled out-of-band (e.g. messenger data folder backed up separately as a tar). Excluded from per-file diff."}
+  ],
+
+  "ext_noise": [
+    ".dll", ".class", ".pyc", ".pyo", ".o", ".obj", ".lnk", ".bak", ".crc",
+    ".fls", ".aux", ".synctex", ".fdb_latexmk", ".blg", ".bbl", ".toc",
+    ".lof", ".lot", ".out", ".nav", ".snm", ".ini", ".cfg", ".config", ".log"
+  ]
+}

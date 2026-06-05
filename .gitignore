@@ -1,0 +1,13 @@
+# Your run's private data — never commit. These hold real machine paths.
+scripts/config.json
+index/
+web/tree.json
+exclude-state.json
+*.tsv
+*.list
+
+# Keep the anonymized samples that ship with the repo
+!web/tree.json.example
+
+__pycache__/
+*.pyc

@@ -1,0 +1,62 @@
+{
+  "total_files": 8,
+  "total_size": 4259840,
+  "tree": [
+    {
+      "name": "C:",
+      "size": 4259840,
+      "count": 8,
+      "isfile": false,
+      "children": [
+        {
+          "name": "Users",
+          "size": 4259840,
+          "count": 8,
+          "isfile": false,
+          "children": [
+            {
+              "name": "alice",
+              "size": 4259840,
+              "count": 8,
+              "isfile": false,
+              "children": [
+                {
+                  "name": "Desktop",
+                  "size": 1572864,
+                  "count": 2,
+                  "isfile": false,
+                  "children": [
+                    {"name": "todo.txt", "size": 4096, "count": 1, "isfile": true},
+                    {"name": "screenshot.png", "size": 1568768, "count": 1, "isfile": true}
+                  ]
+                },
+                {
+                  "name": "Projects",
+                  "size": 2686976,
+                  "count": 6,
+                  "isfile": false,
+                  "children": [
+                    {
+                      "name": "blogpost",
+                      "size": 2686976,
+                      "count": 6,
+                      "isfile": false,
+                      "children": [
+                        {"name": "README.md", "size": 8192, "count": 1, "isfile": true},
+                        {"name": "draft.md", "size": 16384, "count": 1, "isfile": true},
+                        {"name": "header.jpg", "size": 1048576, "count": 1, "isfile": true},
+                        {"name": "diagram.svg", "size": 65536, "count": 1, "isfile": true},
+                        {"name": "thumbnail.png", "size": 524288, "count": 1, "isfile": true},
+                        {"name": "notes.txt", "size": 1024000, "count": 1, "isfile": true}
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

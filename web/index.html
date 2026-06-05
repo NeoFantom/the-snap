@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>file-organizer — to-migrate tree browser</title>
+<style>
+  :root { --line:#cfcfcf; --ink:#1d1d1f; --dim:#6b6b70; --hit:#0a66c2; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; color: var(--ink);
+    font: 14px/1.55 -apple-system, "Segoe UI", "Microsoft YaHei", monospace;
+    background: #fff;
+  }
+  header {
+    position: sticky; top: 0; z-index: 5; background: #fff;
+    border-bottom: 1px solid #e3e3e3; padding: 12px 18px;
+  }
+  h1 { font-size: 15px; margin: 0 0 8px; font-weight: 600; }
+  .stat { font-size: 13px; color: var(--dim); }
+  .stat b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .stat .keep { color: #1a7f37; }
+  .stat .drop { color: #b3261e; }
+  .bar { margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  button {
+    font: inherit; padding: 4px 12px; border: 1px solid #c4c4c4; border-radius: 6px;
+    background: #f6f6f6; cursor: pointer;
+  }
+  button:hover { background: #ececec; }
+  #tree { padding: 10px 18px 60px; }
+  .node { }
+  .row {
+    display: flex; align-items: baseline; gap: 6px;
+    padding: 1px 0; white-space: nowrap;
+  }
+  .row:hover { background: #f4f8ff; }
+  .caret {
+    width: 1em; flex: none; text-align: center; color: var(--dim);
+    cursor: pointer; user-select: none;
+  }
+  .caret.leaf { color: transparent; cursor: default; }
+  input[type=checkbox] { flex: none; margin: 0 2px 0 0; cursor: pointer; }
+  .name { cursor: pointer; }
+  .name.dir { font-weight: 600; }
+  .name.dropped { text-decoration: line-through; color: var(--dim); }
+  .leader { flex: 1 1 auto; border-bottom: 1px dotted var(--line); transform: translateY(-3px); min-width: 18px; }
+  .size { flex: none; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .cnt  { flex: none; color: #9a9aa0; font-variant-numeric: tabular-nums; width: 6.5em; text-align: right; }
+  .children { margin-left: 1.3em; border-left: 1px solid #f0f0f0; padding-left: 2px; display: none; }
+  .children.open { display: block; }
+  #exportBox { width: 100%; height: 160px; margin-top: 8px; display: none;
+    font: 12px/1.4 monospace; white-space: pre; }
+  #ctxmenu { position: fixed; display: none; z-index: 50; background: #fff;
+    border: 1px solid #c4c4c4; border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.15);
+    padding: 4px 0; min-width: 130px; }
+  #ctxmenu .mi { padding: 6px 14px; cursor: pointer; white-space: nowrap; }
+  #ctxmenu .mi:hover { background: #f0f6ff; }
+  #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    background: #1d1d1f; color: #fff; padding: 7px 16px; border-radius: 8px;
+    font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 60; }
+  #toast.show { opacity: .92; }
+</style>
+</head>
+<body>
+<header>
+  <h1>to-migrate tree — check = keep, uncheck = exclude (directories cascade)</h1>
+  <div class="stat" id="stat">Loading…</div>
+  <div class="bar">
+    <button onclick="expandTop()">Expand top</button>
+    <button onclick="collapseAll()">Collapse all</button>
+    <button onclick="showExport()">Show exclusion list</button>
+    <span class="stat" id="saved" style="margin-left:6px;color:#1a7f37;">Selections auto-save</span>
+  </div>
+  <textarea id="exportBox" readonly></textarea>
+</header>
+<div id="tree"></div>
+<div id="ctxmenu">
+  <div class="mi" data-act="path">Copy full path</div>
+  <div class="mi" data-act="name">Copy name</div>
+</div>
+<div id="toast"></div>
+
+<script>
+let DATA = null;
+const SEP = "\\";
+
+function fmt(b){
+  if (b >= 1073741824) return (b/1073741824).toFixed(2)+" GB";
+  if (b >= 1048576) return (b/1048576).toFixed(1)+" MB";
+  if (b >= 1024) return (b/1024).toFixed(0)+" KB";
+  return b+" B";
+}
+
+function setExcluded(node, val){
+  node._ex = val;
+  if (node.children) for (const c of node.children) setExcluded(c, val);
+}
+
+function calcKept(nodes, parentEx){
+  let s=0, f=0;
+  for (const n of nodes){
+    const ex = parentEx || n._ex;
+    if (n.isfile){ if(!ex){ s+=n.size; f+=1; } }
+    else { const r = calcKept(n.children, ex); s+=r[0]; f+=r[1]; }
+  }
+  return [s,f];
+}
+
+function updateStat(){
+  const [ks, kf] = calcKept(DATA.tree, false);
+  const ds = DATA.total_size - ks, df = DATA.total_files - kf;
+  document.getElementById("stat").innerHTML =
+    `Total <b>${DATA.total_files}</b> files / <b>${fmt(DATA.total_size)}</b> &nbsp;|&nbsp; `+
+    `<span class="keep">Keep <b>${kf}</b> / <b>${fmt(ks)}</b></span> &nbsp;|&nbsp; `+
+    `<span class="drop">Drop <b>${df}</b> / <b>${fmt(ds)}</b></span>`;
+}
+
+function rowEl(node, path){
+  const row = document.createElement("div");
+  row.className = "row";
+
+  const caret = document.createElement("span");
+  caret.className = "caret" + (node.isfile ? " leaf" : "");
+  caret.textContent = node.isfile ? "•" : "▸";
+
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = !node._ex;
+  cb.onclick = (e) => e.stopPropagation();
+
+  const name = document.createElement("span");
+  name.className = "name " + (node.isfile ? "file" : "dir") + (node._ex ? " dropped" : "");
+  name.textContent = node.name;
+
+  const leader = document.createElement("span");
+  leader.className = "leader";
+
+  const size = document.createElement("span");
+  size.className = "size";
+  size.textContent = fmt(node.size);
+
+  const cnt = document.createElement("span");
+  cnt.className = "cnt";
+  cnt.textContent = node.isfile ? "" : node.count + " items";
+
+  row.append(caret, cb, name, leader, size, cnt);
+  row.oncontextmenu = (e) => { e.preventDefault(); showCtx(e.clientX, e.clientY, path, node.name); };
+
+  const wrap = document.createElement("div");
+  wrap.className = "node";
+  wrap.appendChild(row);
+
+  let kids = null;
+  let rendered = false;
+  const renderKids = () => {
+    kids.innerHTML = "";
+    for (const c of node.children) kids.appendChild(rowEl(c, path+SEP+c.name));
+  };
+  if (!node.isfile){
+    kids = document.createElement("div");
+    kids.className = "children";
+    wrap.appendChild(kids);
+    const toggle = () => {
+      if (!rendered){ renderKids(); rendered = true; }
+      kids.classList.toggle("open");
+      caret.textContent = kids.classList.contains("open") ? "▾" : "▸";
+    };
+    row.onclick = toggle;
+    row.style.cursor = "pointer";
+  }
+
+  cb.onchange = () => {
+    setExcluded(node, !cb.checked);
+    if (kids && rendered) renderKids();
+    name.classList.toggle("dropped", node._ex);
+    updateStat();
+    postState();
+  };
+
+  return wrap;
+}
+
+function render(){
+  const root = document.getElementById("tree");
+  root.innerHTML = "";
+  for (const n of DATA.tree) root.appendChild(rowEl(n, n.name));
+  updateStat();
+}
+
+function expandTop(){
+  document.querySelectorAll("#tree > .node > .row").forEach(r => {
+    const c = r.querySelector(".caret");
+    if (c && !c.classList.contains("leaf")) r.click();
+  });
+}
+function collapseAll(){ render(); }
+
+function collectExcluded(nodes, path, parentEx, out){
+  for (const n of nodes){
+    const p = path ? path+SEP+n.name : n.name;
+    if (n._ex && !parentEx){ out.push([p, n.size, n.isfile?1:n.count]); continue; }
+    if (n.children) collectExcluded(n.children, p, parentEx || n._ex, out);
+  }
+}
+function showExport(){
+  const out = [];
+  collectExcluded(DATA.tree, "", false, out);
+  const box = document.getElementById("exportBox");
+  if (!out.length){ box.value = "(no exclusions)"; }
+  else {
+    box.value = out.map(([p,s,c]) => `${p}\t${fmt(s)}\t${c} items`).join("\n");
+  }
+  box.style.display = "block";
+  box.focus(); box.select();
+}
+
+let ctxPath = "", ctxName = "";
+function showCtx(x, y, path, name){
+  ctxPath = path; ctxName = name;
+  const m = document.getElementById("ctxmenu");
+  m.style.left = Math.min(x, window.innerWidth - 145) + "px";
+  m.style.top = Math.min(y, window.innerHeight - 70) + "px";
+  m.style.display = "block";
+}
+function hideCtx(){ document.getElementById("ctxmenu").style.display = "none"; }
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._tm); t._tm = setTimeout(() => t.classList.remove("show"), 1200);
+}
+function copyText(t){
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(() => toast("Copied: " + t), () => fallbackCopy(t));
+  } else fallbackCopy(t);
+}
+function fallbackCopy(t){
+  const ta = document.createElement("textarea");
+  ta.value = t; document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); toast("Copied: " + t); } catch(e) { toast("Copy failed"); }
+  ta.remove();
+}
+document.addEventListener("click", hideCtx);
+document.addEventListener("scroll", hideCtx, true);
+document.querySelectorAll("#ctxmenu .mi").forEach(mi => {
+  mi.addEventListener("click", (e) => {
+    e.stopPropagation();
+    copyText(mi.dataset.act === "name" ? ctxName : ctxPath);
+    hideCtx();
+  });
+});
+
+let saveTimer = null;
+function postState(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const out = []; collectExcluded(DATA.tree, "", false, out);
+    fetch("/api/state", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ excluded: out.map(o => o[0]), updated: new Date().toISOString() })
+    }).then(() => {
+      const el = document.getElementById("saved");
+      if (el) el.textContent = "✓ saved " + new Date().toLocaleTimeString() + " (" + out.length + " excluded)";
+    }).catch(() => {
+      const el = document.getElementById("saved");
+      if (el) el.textContent = "⚠ save failed — check server";
+    });
+  }, 250);
+}
+function findNode(path){
+  const segs = path.split(SEP);
+  let nodes = DATA.tree, node = null;
+  for (const s of segs){
+    node = nodes.find(n => n.name === s);
+    if (!node) return null;
+    nodes = node.children || [];
+  }
+  return node;
+}
+function applySaved(paths){
+  for (const p of (paths || [])){ const n = findNode(p); if (n) setExcluded(n, true); }
+}
+
+Promise.all([
+  fetch("./tree.json").then(r => r.json()),
+  fetch("/api/state").then(r => r.json()).catch(() => ({}))
+]).then(([d, state]) => {
+  DATA = d;
+  applySaved(state.excluded);
+  render();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,219 @@
+---
+name: file-organizer
+description: Audit a machine (or directory) before wipe/cleanup — index, diff against a reference, refine to a hand-reviewable to-migrate list, copy with verification.
+trigger_keywords:
+  - migrate
+  - migration
+  - wipe
+  - decommission
+  - audit files
+  - what's unique on this machine
+  - C drive cleanup
+  - collect project files
+  - 文件收纳师
+  - 文件整理
+  - 迁移
+  - 重置前
+---
+
+# file-organizer / 文件收纳师 — agent workflow
+
+> One-shot "is everything safe before I wipe this?" audit + migration.
+> Works for: PC handoff, C-drive cleanup, scoping a project's true file
+> footprint, catching what FreeFileSync / robocopy / rsync hide.
+
+## When to invoke this skill
+
+Pattern-match against the user's intent (not just literal keywords):
+
+- Source machine about to be **reset / wiped / replaced**, user wants to
+  confirm everything important already has a copy elsewhere.
+- Cleaning up a fat C-drive, user wants to know **what's actually unique**
+  vs. what already lives on a backup / NAS / other machine.
+- Gathering all files related to a project / topic before archiving.
+- "I'm not sure if my backup tool covers X — can you double-check?"
+
+Do **not** invoke for: ongoing sync (use FreeFileSync / Syncthing /
+rsync), single-file copies, or git-managed code (just `git push`).
+
+## What you produce
+
+A reproducible pipeline that ends in three artifacts:
+
+1. `index/to-migrate.tsv` — the refined source-only / source-newer file
+   list, ready for human review.
+2. `index/exclude-state.json` — the user's keep/drop selections from the
+   web UI.
+3. `<landed_root>/` — actually-copied files, size-verified against the
+   manifest.
+
+Plus markdown reports: `index/report-missing.md`, `index/report-migrate.md`.
+
+## The standard pipeline
+
+```
+0. Calibrate         ← human + agent collaboration
+1. Index source      ← scripts/index-remote.ps1   (SSH to source)
+2. Index reference   ← scripts/index-local.py     (walk local roots)
+3. Layer-1 compare   ← scripts/compare.py         → missing.tsv
+4. Refine            ← scripts/diff-analyze.py    → to-migrate.tsv
+5. Tree for web      ← scripts/build-tree.py      → web/tree.json
+6. Human review      ← scripts/serve.py           ← exclude-state.json (live)
+7. Copy              ← scripts/copy-scattered.py + tar over ssh
+8. Verify            ← scripts/verify-landed.py
+9. Apps inventory    ← scripts/apps-remote.ps1 + apps-extras.ps1
+```
+
+Run these *in order*. Each step is a pure function of the previous
+artifacts, so re-running step N after editing a config only requires
+re-running N..9.
+
+## Step-by-step playbook
+
+### 0. Calibrate (human collab — do NOT skip)
+
+Before any scanning, work with the user to fill in `scripts/config.json`
+(copy from `scripts/config.example.json`):
+
+- **source**: hostname, ssh user (prefer a non-admin account — see
+  METHODOLOGY §5), drive letters to scan.
+- **reference**: local mount roots where copies might already exist.
+- **landed_root**: where new copies will land.
+- **exclude_dirs**: start with the example list. **CRITICAL**: before
+  adding `ProgramData`, `AppData`, or `Public`, get the user to confirm
+  whether any user-placed portable apps or chat-history dumps live there.
+  If unsure, **list the top level first** (one ssh, ten seconds) and
+  classify each child as app-output vs. user-content. See METHODOLOGY §5
+  pitfalls — this trap has eaten ~12 GB of chat history in a real run.
+
+If the user says "just run it" without calibration, **stop and explain**
+that the wrong exclusion list silently drops their data. Show the top
+level of `ProgramData` / `AppData` and ask before proceeding.
+
+### 1. Index source
+
+```bash
+B64=$(iconv -t UTF-16LE < scripts/index-remote.ps1 | base64 -w0)
+ssh "$USER@$HOST" "powershell -NoProfile -EncodedCommand $B64" > index/source.tsv
+```
+
+Expected: thousands–hundreds-of-thousands of lines. Spot-check that
+CJK paths look right (not mojibake).
+
+### 2. Index reference
+
+```bash
+python3 scripts/index-local.py > index/reference.tsv
+```
+
+If the reference includes a slow USB drive, allow time and don't
+re-run lightly.
+
+### 3. Layer-1 compare
+
+```bash
+python3 scripts/compare.py index/source.tsv index/reference.tsv > index/report-missing.md
+```
+
+Reports source files whose (basename, size) pair is missing from the
+reference. Over-reports (safe direction). Outputs `index/missing.tsv`.
+
+### 4. Refine
+
+```bash
+python3 scripts/diff-analyze.py index/source.tsv index/reference.tsv
+```
+
+Strips third-party clones, build noise, hidden config, user-excluded
+prefixes; bidirectional diff classifies `unique` / `changed` / `present`.
+Outputs `index/to-migrate.tsv` and `index/report-migrate.md`.
+
+If `report-migrate.md`'s top dirs include surprising entries (a build
+tree, a cache, a third-party clone), update `config.json` and re-run
+this step only.
+
+### 5. Tree for web
+
+```bash
+python3 scripts/build-tree.py index/to-migrate.tsv web/tree.json
+```
+
+### 6. Human review
+
+```bash
+python3 scripts/serve.py
+```
+
+Open `http://localhost:26826/`. User clicks dirs/files to drop. Each
+click POSTs the full exclusion list → `index/exclude-state.json` is
+overwritten live; reload / restart preserves selections.
+
+**Important**: this step is the only step *requiring* the user. Do not
+proceed to copy until they confirm they're done reviewing.
+
+### 7. Copy
+
+```bash
+python3 scripts/copy-scattered.py
+# Then tar over ssh, per drive. Example for drive C, source side Windows:
+iconv -f UTF-8 -t GBK < index/scattered-C.list > index/scattered-C.gbk.list
+scp index/scattered-C.gbk.list "$USER@$HOST:C:/tmp/"
+ssh "$USER@$HOST" 'cmd /c "chcp 65001 >nul & cd C:/ & tar -cf - -T C:/tmp/scattered-C.gbk.list"' \
+  | tar -xf - -C "$LANDED_ROOT/C"
+```
+
+CJK / `tar -T` / `cmd` quote gotchas: see METHODOLOGY §5.
+
+### 8. Verify
+
+```bash
+python3 scripts/verify-landed.py
+```
+
+Stat every landed file, compare against manifest. Expected: 0 missing,
+0 size mismatch. Investigate any non-zero before declaring victory.
+
+### 9. Apps inventory (parallel to file pipeline, can run any time)
+
+```bash
+ssh "$USER@$HOST" "powershell -NoProfile -EncodedCommand $(iconv -t UTF-16LE < scripts/apps-remote.ps1   | base64 -w0)" > index/source.apps.tsv
+ssh "$USER@$HOST" "powershell -NoProfile -EncodedCommand $(iconv -t UTF-16LE < scripts/apps-extras.ps1   | base64 -w0)" > index/source.apps-extras.txt
+# Optional but recommended for batch reinstall:
+ssh "$USER@$HOST" 'powershell -NoProfile -Command "winget export --accept-source-agreements -o $env:TEMP\winget-export.json | Out-Null; Get-Content -Raw -Encoding UTF8 $env:TEMP\winget-export.json"' \
+  > index/source.winget.json
+```
+
+`winget import index/source.winget.json` on the new machine replays the
+subset reinstallable from winget sources. The rest needs manual install
+per `apps-extras.txt`.
+
+## Failure modes & recovery
+
+- **`tar` reports `Can't convert a path to a wchar_t string`** on Windows
+  → the file list isn't GBK. `iconv -f UTF-8 -t GBK` it first.
+  METHODOLOGY §5.
+- **`Get-ChildItem` runs forever (millions of rows)** → junctions are
+  being followed. Confirm `index-remote.ps1` has the `ReparsePoint`
+  skip. METHODOLOGY §5.
+- **Verify reports "all files differ"** but file counts match → manifest
+  has trailing `\r` from PowerShell output. Pipe through `tr -d '\r'`
+  before diffing.
+- **"`SimplePrograms` / app data is missing from the index"** → the
+  exclude list ate `ProgramData` or `AppData` wholesale. Remove it and
+  re-index that root specifically; see METHODOLOGY §5.
+
+## Don't do these
+
+- Don't whole-disk hash. Layer-1 (name+size) plus on-demand hashing is
+  enough for a wipe audit.
+- Don't whitelist on the source — a missing dir is a permanently lost
+  file. Use blacklist + careful top-level audit of shared-data roots.
+- Don't claim "migration complete" without running step 8.
+- Don't add `ProgramData` / `AppData` / `Public` to the exclude list
+  without auditing their top level first.
+
+## Tone for user updates
+
+Concise. Report at major step boundaries (counts + size). Surface
+anomalies immediately (large unexpected dirs, encoding errors,
+verification mismatches). Don't narrate per-file progress.

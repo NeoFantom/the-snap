@@ -1,7 +1,14 @@
 # the-snap
 
-> Half your files are about to vanish with a wipe. You decide who survives.
->
+**After the snap, only some of your files remain — you decide which ones.**
+
+**the-snap finds the files that exist *only* on a machine you're about to wipe.**
+It indexes that machine and a reference (your new PC / backup / NAS), matches
+files by **name + content hash** so a file that merely *moved* isn't flagged or
+copied twice, shows you the source-only files in a browser tree where you click
+to keep or drop, then copies the survivors and verifies each one. Works when
+either side is Windows, macOS, Linux, or WSL.
+
 > A reproducible workflow for migrating, auditing, and pruning files across
 > machines — built for the "PC about to be wiped, what did I forget?" moment,
 > usable for any file-organizing chore.
@@ -16,15 +23,20 @@ Given two roots (source and reference) — typically *the old machine* and
 *the new machine* — this toolkit:
 
 1. **Indexes** both sides into TSVs (path, size, mtime) without recursing into
-   black-listed system / cache / dependency directories.
-2. **Compares** by name+size: classifies each file as `present` (already on
-   reference), `changed` (same name, different size), or `unique` (source-only).
+   black-listed system / cache / dependency directories. Any OS on either side.
+2. **Compares** by **name + content hash**: small files whose name+size match are
+   confirmed by sha256 (catching same-name-same-size-but-different-content), while
+   large files (> `hash_max_bytes`) are matched by name+size — a big file almost
+   never collides on size, and hashing it is the expensive case. Each file is
+   classified `present` (already on reference), `changed` (different content), or
+   `unique` (source-only). Hashing happens natively on each machine; files never
+   travel just to be compared.
 3. **Refines** the *to-migrate* list by stripping noise (build artifacts,
    third-party clones, hidden config dirs, user-declared drops).
 4. **Serves** an interactive tree at `http://localhost:<hash-port>/` where you
    click to exclude prefixes; selections persist live to JSON.
-5. **Copies** the refined set, preserving non-ASCII (CJK/emoji) filenames via
-   `tar`-over-ssh with explicit encoding handling.
+5. **Copies** the refined set, preserving non-ASCII (CJK/emoji) filenames
+   (`tar`-over-ssh for Windows sources, `rsync` for unix).
 6. **Verifies** every landed file by size against the manifest.
 
 Designed for: pre-wipe migration; C-drive cleanup; project-file collection;
@@ -60,6 +72,7 @@ Two pitfalls this toolkit specifically catches (see `METHODOLOGY.md`):
 │   └── check-no-pii.sh       # guard: fail if private data leaks in
 ├── web/                # interactive tree-exclude UI (no build, just open)
 │   └── tree.json.example     # anonymized sample data
+├── docs/               # platforms.md — per-OS & WSL/cross-VM recipes
 └── plugins/            # adapter manifests for claude-code / codex / opencode
 ```
 
@@ -69,32 +82,36 @@ Two pitfalls this toolkit specifically catches (see `METHODOLOGY.md`):
 # 0. Configure (host, ssh user, drives, exclusions) — read the inline comments
 cp scripts/config.example.json scripts/config.json && $EDITOR scripts/config.json
 
-# 1. Index the remote (Windows) machine you're about to wipe
+# 1. Index the machine you're about to wipe (the "source")
+#    Windows source (no Python needed there):
 B64=$(iconv -t UTF-16LE < scripts/index-remote.ps1 | base64 -w0)
-ssh "$REMOTE_USER@$REMOTE_HOST" "powershell -NoProfile -EncodedCommand $B64" \
-    > index/source.tsv
+ssh "$REMOTE_USER@$REMOTE_HOST" "powershell -NoProfile -EncodedCommand $B64" > index/source.tsv
+#    mac / linux / WSL source instead: pipe the Python indexer over ssh
+#    ssh "$REMOTE_USER@$REMOTE_HOST" python3 - --roots /home /data < scripts/index-local.py > index/source.tsv
+#    (WSL crossing to its Windows host? see docs/platforms.md — index natively, don't walk /mnt/c)
 
 # 2. Index the local reference (roots come from config.json)
 python3 scripts/index-local.py > index/reference.tsv
 
-# 3. Compare, then diff & refine to the to-migrate list
+# 3. Compare, refine, then confirm small-file candidates by content hash
 python3 scripts/compare.py index/source.tsv index/reference.tsv > index/report-missing.md
 python3 scripts/diff-analyze.py index/source.tsv index/reference.tsv
+python3 scripts/hash-confirm.py        # add --src-local if the source is this machine
 
 # 4. Build the tree and audit interactively (browser persists clicks to JSON)
 python3 scripts/build-tree.py index/to-migrate.tsv web/tree.json
 python3 scripts/serve.py
 # open http://localhost:<port>/
 
-# 5. Copy the refined set (tar-over-ssh; see SKILL.md step 7 for CJK handling)
+# 5. Copy the refined set (Windows: tar-over-ssh; unix: rsync — see SKILL.md step 7)
 python3 scripts/copy-scattered.py
 
 # 6. Verify every landed file by size
 python3 scripts/verify-landed.py
 ```
 
-Full step-by-step (incl. the exact tar-over-ssh commands and CJK/encoding
-gotchas): see `SKILL.md`.
+Full step-by-step (incl. the exact tar/rsync commands, CJK/encoding gotchas,
+and per-platform recipes): see `SKILL.md` and `docs/platforms.md`.
 
 ## Installing as an agent skill
 
@@ -112,12 +129,14 @@ files", "what's unique on this machine", etc.
 
 Pre-1.0. Current limitations:
 
-- The `index-remote.ps1` script is Windows-only. macOS / Linux source indexing
-  uses `index-local.py` for now.
-- Diff is name+size; no content hashing (deliberate — full-disk hashing is
-  too slow for the audit workflow). Pluggable hash check is on the roadmap.
-- `tar`-over-ssh assumes the remote has `bsdtar` (Windows 10+ ships it). For
-  Unix sources, GNU tar works fine.
+- Content hashing is **name+size-gated**: it confirms small (≤ `hash_max_bytes`)
+  name+size matches by sha256, and trusts name+size for larger files. This is a
+  deliberate trade-off (whole-disk hashing is too slow) — a large file with a
+  colliding size but different content would be treated as already-present.
+- Source indexing: Windows uses `index-remote.ps1` (no Python required there);
+  macOS / Linux / WSL pipe `index-local.py` over ssh.
+- `tar`-over-ssh assumes the remote has `bsdtar` (Windows 10+ ships it); unix
+  sources use `rsync` instead.
 
 ## License
 

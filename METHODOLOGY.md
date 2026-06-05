@@ -43,12 +43,22 @@ read per side.
 
 Whole-disk hashing is too slow. Two layers:
 
-1. Match by **name + size** (cheap, pure string/int compare).
-2. *Only* on name+size hit, optionally hash to confirm content (expensive,
-   on demand).
+1. Match by **name + size** (cheap, pure string/int compare). Different sizes
+   → different content for sure; no hash needed. This kills ~99% of the budget.
+2. On a name+size hit, **confirm by content sha256** — but only for files at or
+   below a size threshold (`hash_max_bytes`, default 64 MiB). This catches the
+   dangerous case (same name, same size, *different* content) that would
+   otherwise be mistaken for an existing copy and lost. Larger files are trusted
+   on name+size alone: a big file colliding on exact byte-size is vanishingly
+   unlikely, and it is precisely the expensive thing to hash.
 
-Different sizes → different files; no hash needed. This kills 99% of the
-hash budget.
+Hashing runs **natively on each machine** (remote `Get-FileHash`/`sha256sum`,
+local `hashlib`); only `path → hash` crosses the wire, never the file. Results
+are cached by `(path, size, mtime)` so re-runs are cheap.
+
+> Lineage note: this two-layer scheme was the original design, but early
+> versions stopped at layer 1 and never hashed. `hash-confirm.py` implements
+> layer 2.
 
 ### 2.4 Noise exclusion — the make-or-break step
 
@@ -108,12 +118,13 @@ keep / drop, export the final manifest.
 3. Scope by size         → file counts / sizes per candidate dir; data-driven
                            narrowing of scan scope
 4. Define exclusions     → centralize the noise / skip rules
-5. Build indexes (both)  → row counts sane, CJK paths not garbled
-6. Layer-1 compare       → produce missing.tsv
-7. Bidirectional diff    → strip third-party + noise → to-migrate.tsv
-8. Human review (web)    → checkbox tree, export final selection
-9. Copy + verify         → sample-compare source vs landed
-10. Wire into ongoing    → fold the landed area into routine backup
+5. Build indexes (both)  → row counts sane, CJK paths not garbled (any OS)
+6. Layer-1 compare       → produce missing.tsv (name+size candidates)
+7. Bidirectional diff    → strip third-party + noise → to-migrate.tsv + needs-hash.tsv
+8. Hash-confirm (layer2) → sha256 small candidates natively → resolve present/changed
+9. Human review (web)    → checkbox tree, export final selection
+10. Copy + verify        → sample-compare source vs landed
+11. Wire into ongoing    → fold the landed area into routine backup
                            (e.g. FreeFileSync)
 ```
 
@@ -121,14 +132,17 @@ keep / drop, export the final manifest.
 
 | Script | Purpose |
 |---|---|
-| `index-remote.ps1` | On a Windows source: walk roots minus blacklist, emit `path\tsize\tmtime` TSV. |
-| `index-local.py` | On reference (local or mounted): same format. |
-| `compare.py` | Layer-1 compare (name+size), produces `missing.tsv` and a report. |
-| `diff-analyze.py` | Bidirectional refinement: strip third-party + noise → `to-migrate.tsv`. |
+| `index-remote.ps1` | Windows source: walk roots minus blacklist → `path\tsize\tmtime` TSV (mtime unix sec). |
+| `index-local.py` | Cross-platform indexer (any OS): config mode locally, `--roots` arg mode over ssh. |
+| `compare.py` | Layer-1 compare (name+size candidates) → `missing.tsv` + report. |
+| `diff-analyze.py` | Bidirectional refine: strip third-party + noise → `to-migrate.tsv` + `needs-hash.tsv`. |
+| `hash-confirm.py` | Layer-2: sha256 small name+size candidates natively → present / changed-hash. |
+| `hash-remote.ps1` | Windows source-side hasher (`Get-FileHash`), reads paths on stdin. |
 | `build-tree.py` | Build a nested-tree JSON from a TSV for the web UI. |
 | `serve.py` | Static GET + `POST /api/state` to persist exclusion selections live to `exclude-state.json`. |
-| `copy-scattered.py` | From `to-migrate.tsv`, drop user-excluded prefixes, produce per-drive `tar -T` file lists. |
+| `copy-scattered.py` | From `to-migrate.tsv`, drop excluded prefixes → per-root `tar`/`rsync` lists. |
 | `verify-landed.py` | For every kept entry: stat the landed file, compare size against the manifest. |
+| `_paths.py` / `_hash.py` | Helpers: separator-agnostic paths; cached sha256. |
 | `web/index.html` | Collapsible tree browser: check to keep/drop (live persistence), right-click to copy path. |
 
 ## 5. Pitfalls & lessons

@@ -5,8 +5,12 @@ by size desc.
 
 Usage: python3 scripts/build-tree.py index/missing.tsv web/tree.json
 """
+import os
 import sys
 import json
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _paths
 
 
 def main():
@@ -23,7 +27,7 @@ def main():
         path, size = parts[0], int(parts[1])
         nfiles += 1
         total += size
-        segs = path.split("\\")
+        segs = _paths.segments(path)
         cur = root
         for i, seg in enumerate(segs):
             is_leaf = i == len(segs) - 1

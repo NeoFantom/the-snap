@@ -2,9 +2,13 @@
 """verify-landed.py — for every entry in to-migrate.tsv (minus user-excluded
 prefixes), stat the landed file and compare size against the manifest.
 
-Mapping:  ``X:\\rel\\path``  →  ``<config.landed_root.path>/<rel/path>``
-(forward slashes, drive letter dropped; matches the layout produced by
-running ``tar -C X:/ -T scattered-X.list`` into that root.)
+This is a TRANSFER-integrity check (did each file copy land at the right size),
+which is a different concern from the name+hash content comparison done by
+diff-analyze.py / hash-confirm.py during the audit.
+
+Mapping (works for Windows and POSIX sources alike, via _paths.split_root):
+  ``X:\\rel\\path``  →  ``<landed_root>/rel/path``   (drive dropped)
+  ``/a/b/c``         →  ``<landed_root>/a/b/c``
 
 Outputs:
   index/verify-missing.tsv   missing or size-mismatched
@@ -16,6 +20,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _config import load
+import _paths
 
 cfg = load()
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -23,18 +28,15 @@ IDX = os.path.join(ROOT, "index")
 LANDED = cfg["landed_root"]["path"]
 
 
-def norm(p):
-    return p.replace("/", "\\").rstrip("\\").lower()
-
-
 excluded = []
 excl_path = os.path.join(IDX, "exclude-state.json")
 if os.path.exists(excl_path):
-    excluded = [norm(x) for x in json.load(open(excl_path, encoding="utf-8")).get("excluded", [])]
+    excluded = [_paths.norm_key(x) for x in
+                json.load(open(excl_path, encoding="utf-8")).get("excluded", [])]
 
 
 def is_excluded(p):
-    n = norm(p)
+    n = _paths.norm_key(p)
     for pre in excluded:
         if n == pre or n.startswith(pre + "\\"):
             return True
@@ -54,7 +56,7 @@ with open(os.path.join(IDX, "to-migrate.tsv"), encoding="utf-8") as f:
         if is_excluded(path):
             continue
         expected = int(size_str)
-        rel = path[3:].replace("\\", "/")
+        rel = _paths.split_root(path)[1]
         landed = os.path.join(LANDED, rel)
         try:
             actual = os.stat(landed).st_size

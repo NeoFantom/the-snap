@@ -1,5 +1,6 @@
 # index-remote.ps1 — full-disk blacklist walker for the SOURCE machine (Windows).
-# Emits TSV to stdout: <full path>\t<size bytes>\t<mtime UTC ticks>
+# Emits TSV to stdout: <full path>\t<size bytes>\t<mtime unix seconds, UTC>
+# (mtime is unix epoch seconds so it matches index-local.py on every OS.)
 #
 # Skips junctions/reparse points (avoids re-entering blacklisted regions via
 # legacy aliases like All Users -> ProgramData). Skips configured directory
@@ -50,7 +51,8 @@ function Walk($dir) {
       if ($skip.Contains($it.FullName)) { continue }
       Walk $it.FullName
     } else {
-      "{0}`t{1}`t{2}" -f $it.FullName, $it.Length, $it.LastWriteTimeUtc.Ticks
+      $mtime = [DateTimeOffset]::new($it.LastWriteTimeUtc).ToUnixTimeSeconds()
+      "{0}`t{1}`t{2}" -f $it.FullName, $it.Length, $mtime
     }
   }
 }

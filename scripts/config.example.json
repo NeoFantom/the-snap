@@ -20,6 +20,9 @@
     "path": "/mnt/c/Backup/from-source"
   },
 
+  "_comment_hash_max_bytes": "Layer-2 content check: files this size or smaller, when name+size match on both sides, are confirmed by sha256 (catches same-name-same-size-different-content). LARGER files are matched by name+size only (a big file almost never collides on size, and hashing it is the expensive case). Default 64 MiB.",
+  "hash_max_bytes": 67108864,
+
   "exclude_dirs": [
     "Windows", "Program Files", "Program Files (x86)",
     "$Recycle.Bin", "System Volume Information", "Recovery",

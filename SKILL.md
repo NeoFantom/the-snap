@@ -10,6 +10,13 @@ when_to_use: Use when a machine is about to be reset / wiped / decommissioned an
 > Works for: PC handoff, C-drive cleanup, scoping a project's true file
 > footprint, catching what FreeFileSync / robocopy / rsync hide.
 
+> **Where commands run.** The scripts below live in this skill's own directory,
+> and the pipeline writes its artifacts (`scripts/config.json`, `index/*.tsv`,
+> `web/tree.json`) alongside them. Run every command from the skill directory —
+> or prefix script paths with `${CLAUDE_SKILL_DIR}/` so they resolve no matter
+> what the current working directory is. Paths below are written relative to the
+> skill directory for readability.
+
 ## When to invoke this skill
 
 Pattern-match against the user's intent (not just literal keywords):

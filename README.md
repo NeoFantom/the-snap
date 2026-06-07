@@ -17,6 +17,43 @@ either side is Windows, macOS, Linux, or WSL.
 
 **Status**: extracted from a real one-shot migration; APIs may shift before 1.0.
 
+## Install
+
+One command. It auto-detects your coding agent (Claude Code, Codex, OpenCode,
+Cursor, … 70+) and drops the whole skill — scripts *and* the web UI — into its
+skills folder:
+
+```bash
+npx skills add NeoFantom/the-snap
+```
+
+| | |
+|---|---|
+| All projects (user-level) | `npx skills add NeoFantom/the-snap -g` |
+| A specific agent | `npx skills add NeoFantom/the-snap -a claude-code` |
+| Preview, don't install | `npx skills add NeoFantom/the-snap --list` |
+| Update later | `npx skills update the-snap` |
+
+Powered by the [`skills`](https://github.com/vercel-labs/skills) CLI — no global
+install, `npx` fetches it on demand.
+
+<details><summary>Manual install (no npx)</summary>
+
+The repo *is* the skill (SKILL.md at root, `scripts/` + `web/` alongside), so
+just point your agent's skills folder at a clone:
+
+```bash
+git clone https://github.com/NeoFantom/the-snap
+ln -s "$(pwd)/the-snap" ~/.claude/skills/the-snap   # Claude Code
+# or ~/.codex/skills/the-snap · ~/.config/opencode/skill/the-snap · …
+```
+
+</details>
+
+Once installed, just describe the job in natural language — *"audit this machine
+before I wipe it"*, *"迁移"*, *"响指"* — and the agent loads the skill and walks
+the pipeline. Trigger phrases live in `SKILL.md`'s `description` / `when_to_use`.
+
 ## What it does
 
 Given two roots (source and reference) — typically *the old machine* and
@@ -72,8 +109,7 @@ Two pitfalls this toolkit specifically catches (see `METHODOLOGY.md`):
 │   └── check-no-pii.sh       # guard: fail if private data leaks in
 ├── web/                # interactive tree-exclude UI (no build, just open)
 │   └── tree.json.example     # anonymized sample data
-├── docs/               # platforms.md — per-OS & WSL/cross-VM recipes
-└── plugins/            # adapter manifests for claude-code / codex / opencode
+└── docs/               # platforms.md — per-OS & WSL/cross-VM recipes
 ```
 
 ## Quick start
@@ -112,18 +148,6 @@ python3 scripts/verify-landed.py
 
 Full step-by-step (incl. the exact tar/rsync commands, CJK/encoding gotchas,
 and per-platform recipes): see `SKILL.md` and `docs/platforms.md`.
-
-## Installing as an agent skill
-
-Each `plugins/<agent>/` directory is a self-contained manifest pointing at
-`SKILL.md`. Symlink or copy into the agent's skill folder:
-
-- **Claude Code**: `~/.claude/skills/the-snap/` → `plugins/claude-code/`
-- **Codex**: see `plugins/codex/README.md`
-- **OpenCode**: see `plugins/opencode/README.md`
-
-The agent will autoload the skill when the user mentions "migrate", "audit
-files", "what's unique on this machine", etc.
 
 ## Status & roadmap
 
